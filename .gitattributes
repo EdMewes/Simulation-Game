@@ -1,0 +1,7 @@
+# Ensure all text files use LF
+* text=auto
+
+# Force LF for Python files, TOML, and lock files
+*.py text eol=lf
+*.toml text eol=lf
+*.lock text eol=lf
