@@ -5,5 +5,6 @@ def time_funtion(func):
         start = time.perf_counter()
         result = func(*args)
         end = time.perf_counter()
-        return result, end-start
+        print(f"{func.__name__} took {end - start:.6f} seconds")
+        return result
     return wrapper
