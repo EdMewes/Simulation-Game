@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import src.physics_sim.heat_equation_solver as hes
+
 def gaussian2d(shape=(100, 100), sigma=10.0, amplitude=1.0, normalize=False):
     h, w = shape
     y = np.arange(h) - (h - 1) / 2.0
@@ -15,23 +16,24 @@ def gaussian2d(shape=(100, 100), sigma=10.0, amplitude=1.0, normalize=False):
     # print(np.shape(g))
     return g
 
+
 # Example: 100x100, centered, sigma=12, normalized to sum to 1
 G = gaussian2d((100, 100), sigma=12.0, amplitude=1.0, normalize=True)
 
 
 sol = hes.CNM_solve(G)
-for time in range(1):
+for time in range(1000):
     sol = hes.CNM_solve(sol)
-    # print(sol.max())
+    print(time * 0.01)
 
 
 # Visualize
-plt.imshow(G, origin='lower')
-plt.colorbar(label='Intensity')
-plt.title('Centered 2D Gaussian (100×100, σ=12)')
+plt.imshow(G, origin="lower")
+plt.colorbar(label="Intensity")
+plt.title("Centered 2D Gaussian (100×100, σ=12)")
 plt.show()
 
-plt.imshow(np.reshape(sol,(100,100)), origin='lower')
-plt.colorbar(label='Intensity')
-plt.title('Centered 2D Gaussian (100×100, σ=12)')
+plt.imshow(np.reshape(sol, (100, 100)), origin="lower")
+plt.colorbar(label="Intensity")
+plt.title("Centered 2D Gaussian (100×100, σ=12)")
 plt.show()
