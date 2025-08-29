@@ -7,37 +7,34 @@ RUN mamba create -y -n dedalus-env -c conda-forge \
     python=3.12 \
     dedalus \
     h5py \
-    mpi4py \
+    mpi4py \ 
     && mamba clean -afy
 
+RUN conda env config vars set -n dedalus-env OMP_NUM_THREADS=1 && \
+    conda env config vars set -n dedalus-env NUMEXPR_MAX_THREADS=1
 
-COPY pyproject.toml ./
+COPY pyproject.toml .
+COPY . .
+# RUN uv pip install -r pyproject.toml
 
-RUN /opt/conda/envs/dedalus-env/bin/pip install uv && \
-    uv pip install -r pyproject.toml
+# ENV PATH="/opt/conda/envs/dedalus-env/bin:$PATH"
 
-
-# RUN python3 -m venv /opt/firedrake-env && \
-#     . /opt/firedrake-env/bin/activate && \
-#     curl -O https://firedrakeproject.org/firedrake-install && \
-#     python3 firedrake-install --disable-ssh
-
+RUN /opt/conda/envs/dedalus-env/bin/pip install . 
 
 FROM condaforge/mambaforge:latest AS runtime
 
 WORKDIR /app
 
+
 COPY --from=builder /opt/conda/envs/dedalus-env \
                     /opt/conda/envs/dedalus-env
+COPY --from=builder /opt/.venv /app/.venv
 
-ENV PATH="/opt/conda/envs/dedalus-env:$PATH"
+RUN mkdir /plots
 
+ENV PATH="/opt/conda/envs/dedalus-env/bin:/app/.venv/bin:$PATH"
 
+COPY . /app
 
-COPY . .
-
-RUN pip install .
-
-# ENV PATH="/opt/conda/bin:/opt/firedrake-env/bin:/venv/bin:$PATH"
-
-ENTRYPOINT [ "physics-sim" ]
+# ENTRYPOINT ["conda", "run", "-n", "dedalus-env", "physics-sim"]
+CMD ["conda", "run", "-n", "dedalus-env", "physics-sim"]
