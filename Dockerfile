@@ -15,9 +15,6 @@ RUN conda env config vars set -n dedalus-env OMP_NUM_THREADS=1 && \
 
 COPY pyproject.toml .
 COPY . .
-# RUN uv pip install -r pyproject.toml
-
-# ENV PATH="/opt/conda/envs/dedalus-env/bin:$PATH"
 
 RUN /opt/conda/envs/dedalus-env/bin/pip install . 
 
