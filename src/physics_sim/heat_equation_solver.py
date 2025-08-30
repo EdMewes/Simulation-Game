@@ -34,12 +34,18 @@ from scipy.sparse.linalg import spsolve
 from physics_sim.timing import time_funtion as tf
 import timeit
 
+import dedalus.public as d3
+
+import logging
+
 
 
 from sympy.solvers.pde import pdsolve
 from sympy import Function, Eq
 from sympy.abc import x, y
 
+
+logger = logging.getLogger(__name__)
 
 
 test_size = 100
@@ -134,12 +140,6 @@ def CNM_spsolve(sp_matrix, initial_data):
     return band_mat_next_timestep
 
 
-spmat = CNM_spmatrix_build(test_size, test_size)
-data = np.random.rand(test_size, test_size)
-time = timeit.timeit(lambda: CNM_spsolve(spmat, data), number=run_cases)
-print("Average runtime of sparse:", time / run_cases)
-
-
 # Sympy cannot solve 2D PDE, but can use for notation
 # def sympy_build_eq():
 #         return
@@ -162,6 +162,63 @@ def FEniCS_sovle():
 def firedrake_sovle():
     return
 
+# Fourier spectral methods - Periodic boundary, diffusion spills over
+def dedalus_sovle_fourier():
 
-def dedalus_sovle():
-    return
+    # Params
+    timestepper = d3.SBDF2
+    timestep = 0.05
+    stop_sim_time = 20
+    Nx = 100
+    Ny = 100
+
+    # Bases
+    coords = d3.CartesianCoordinates('x', 'y') # maybe 'z'
+    dist = d3.Distributor(coords, dtype=np.float64)
+    xbasis = d3.RealFourier(coords['x'], size=Nx, bounds=(0, 1))
+    ybasis = d3.Chebyshev(coords['y'], size=Ny, bounds=(0, 1))
+
+    # Fields
+    h = dist.Field(name='h',bases=(xbasis,ybasis))
+    
+    # Forcing
+    f = dist.Field(name='f',bases=(xbasis,ybasis))
+    f.fill_random('g', seed=40)    
+    
+    # Subs
+    x, y = dist.local_grids(xbasis, ybasis)
+    D = 1
+
+    # Problem
+    problem = d3.IVP([h], namespace=locals())
+    problem.add_equation("dt(h) - D*lap(h) = f")
+
+    # Solve
+    solver = problem.build_solver(timestepper)
+    solver.stop_sim_time = stop_sim_time
+
+    # Analysis
+    snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=0.1, max_writes=10)
+    snapshots.add_task(h, name='temp')
+
+    # Main loop
+    try:
+        logger.info('Starting main loop')
+        while solver.proceed:
+            solver.step(timestep)
+            if (solver.iteration-1) % 10 == 0:
+                logger.info('Iteration=%i, Time=%e, dt=%e' %(solver.iteration, solver.sim_time, timestep))
+    except:
+        logger.error('Exception raised, triggering end of main loop.')
+        raise
+    finally:
+        solver.log_stats()
+
+    return 0
+
+
+if __name__ == "__main__":
+    spmat = CNM_spmatrix_build(test_size, test_size)
+    data = np.random.rand(test_size, test_size)
+    time = timeit.timeit(lambda: CNM_spsolve(spmat, data), number=run_cases)
+    print("Average runtime of sparse:", time / run_cases)
