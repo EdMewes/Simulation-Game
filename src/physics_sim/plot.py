@@ -53,7 +53,7 @@ def animate(files, frame_count, snapshot_rate ,save_file_path):
         with h5.File(file, "r") as f:
             data = f["tasks"]["temp"][index]
             im.set_array(data)
-            # im.set_clim(vmin=data.min(), vmax=data.max())
+            im.set_clim(vmin=data.min(), vmax=data.max())
             ax.set_title(f"{os.path.basename(file)} frame {index}")
             return [im]
         

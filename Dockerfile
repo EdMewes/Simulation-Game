@@ -7,7 +7,8 @@ RUN mamba create -y -n dedalus-env -c conda-forge \
     python=3.12 \
     dedalus \
     h5py \
-    mpi4py \ 
+    mpi4py \
+    ffmpeg \
     && mamba clean -afy
 
 RUN conda env config vars set -n dedalus-env OMP_NUM_THREADS=1 && \
