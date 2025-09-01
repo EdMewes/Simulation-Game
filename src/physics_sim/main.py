@@ -25,74 +25,16 @@ from physics_sim import heat_equation_solver as het
 
 def main():
 
-    sim = het.dedalus_sovle_fourier()
+    # sim = het.dedalus_sovle_fourier()
+    sim = het.dedalus_sovle_chebyshev()
 
-    print('hi there')
-    # logger = logging.getLogger(__name__)
+    # print('hi there')
 
 
-    # # Parameters
-    # Lx, Ly = 2*np.pi, np.pi
-    # Nx, Ny = 1028, 512
-    # dtype = np.float64
-
-    # # Bases
-    # coords = d3.CartesianCoordinates('x', 'y')
-    # dist = d3.Distributor(coords, dtype=dtype)
-    # xbasis = d3.RealFourier(coords['x'], size=Nx, bounds=(0, Lx))
-    # ybasis = d3.Chebyshev(coords['y'], size=Ny, bounds=(0, Ly))
-
-    # # Fields
-    # u = dist.Field(name='u', bases=(xbasis, ybasis))
-    # tau_1 = dist.Field(name='tau_1', bases=xbasis)
-    # tau_2 = dist.Field(name='tau_2', bases=xbasis)
-
-    # # Forcing
-    # x, y = dist.local_grids(xbasis, ybasis)
-    # f = dist.Field(bases=(xbasis, ybasis))
-    # g = dist.Field(bases=xbasis)
-    # h = dist.Field(bases=xbasis)
-    # f.fill_random('g', seed=40)
-    # f.low_pass_filter(shape=(64, 32))
-    # g['g'] = np.sin(8*x) * 0.025
-    # h['g'] = 0
-
-    # # Substitutions
-    # dy = lambda A: d3.Differentiate(A, coords['y'])
-    # lift_basis = ybasis.derivative_basis(2)
-    # lift = lambda A, n: d3.Lift(A, lift_basis, n)
-
-    # # Problem
-    # problem = d3.LBVP([u, tau_1, tau_2], namespace=locals())
-    # problem.add_equation("lap(u) + lift(tau_1,-1) + lift(tau_2,-2) = f")
-    # problem.add_equation("u(y=0) = g")
-    # problem.add_equation("dy(u)(y=Ly) = h")
-
-    # # Solver
-    # solver = problem.build_solver()
-    # solver.solve()
-
-    # # Gather global data
-    # x = xbasis.global_grid(dist, scale=1)
-    # y = ybasis.global_grid(dist, scale=1)
-    # ug = u.allgather_data('g')
-    # print(dist.comm.rank)
-    # # Plot
-    # if dist.comm.rank == 0:
-    #     plt.figure(figsize=(6, 4))
-    #     plt.pcolormesh(x.ravel(), y.ravel(), ug.T, cmap='viridis', shading='gouraud', rasterized=True)
-    #     plt.gca().set_aspect('equal')
-    #     plt.xlabel('x')
-    #     plt.ylabel('y')
-    #     plt.title("Randomly forced Poisson equation")
-    #     plt.tight_layout()
-    #     plt.savefig('poisson.png', dpi=200)
-    # print('hi')
     return 0
 
 
 hi = main()
-
 
 
 
