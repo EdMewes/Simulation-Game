@@ -32,13 +32,15 @@ from scipy.linalg import solve_banded
 from scipy.sparse import diags, csc_array
 from scipy.sparse.linalg import spsolve
 from physics_sim.timing import time_funtion as tf
+import physics_sim.plot as plot
 import timeit
 
 import dedalus.public as d3
-
+import h5py as h5
 import logging
-
-
+import matplotlib.pyplot as plt
+import glob
+from physics_sim.keys import numeric
 
 from sympy.solvers.pde import pdsolve
 from sympy import Function, Eq
@@ -162,32 +164,51 @@ def FEniCS_sovle():
 def firedrake_sovle():
     return
 
+
+def process_results(snapshots_rate):
+    files = sorted(glob.glob("snapshot/snapshot*.h5"), key=numeric)
+    frame_counter = []
+    for file_nam in files:
+        # print(file_nam)
+        plot.dedalus(file_nam)
+        with h5.File(file_nam, 'r') as f:
+            print(file_nam,f["tasks"]["temp"].shape)
+            frame_counter.append(f["tasks"]["temp"].shape[0])
+
+    animation = plot.animate(files, frame_counter, snapshots_rate, 'animation/diffusion.mp4')
+    return animation
+
+
+
 # Fourier spectral methods - Periodic boundary, diffusion spills over
 def dedalus_sovle_fourier():
-
     # Params
     timestepper = d3.SBDF2
     timestep = 0.05
-    stop_sim_time = 20
+    stop_sim_time = 5
     Nx = 100
     Ny = 100
+    # This is currently a flaot
+    snapshots_per_sec = 1/timestep
 
     # Bases
     coords = d3.CartesianCoordinates('x', 'y') # maybe 'z'
     dist = d3.Distributor(coords, dtype=np.float64)
     xbasis = d3.RealFourier(coords['x'], size=Nx, bounds=(0, 1))
-    ybasis = d3.Chebyshev(coords['y'], size=Ny, bounds=(0, 1))
+    ybasis = d3.RealFourier(coords['y'], size=Ny, bounds=(0, 1))
 
     # Fields
     h = dist.Field(name='h',bases=(xbasis,ybasis))
     
     # Forcing
     f = dist.Field(name='f',bases=(xbasis,ybasis))
-    f.fill_random('g', seed=40)    
-    
+    gauss = gaussian2d(shape=f['g'].shape, sigma=5, amplitude=2000, normalize=False)
+    h['g'][:] = gauss
+    f.fill_random('g', seed=40)
+
     # Subs
     x, y = dist.local_grids(xbasis, ybasis)
-    D = 1
+    D = 0.1
 
     # Problem
     problem = d3.IVP([h], namespace=locals())
@@ -198,12 +219,13 @@ def dedalus_sovle_fourier():
     solver.stop_sim_time = stop_sim_time
 
     # Analysis
-    snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=0.1, max_writes=10)
+    snapshots = solver.evaluator.add_file_handler('snapshot', sim_dt=timestep, max_writes=snapshots_per_sec)
     snapshots.add_task(h, name='temp')
 
     # Main loop
     try:
         logger.info('Starting main loop')
+
         while solver.proceed:
             solver.step(timestep)
             if (solver.iteration-1) % 10 == 0:
@@ -213,8 +235,100 @@ def dedalus_sovle_fourier():
         raise
     finally:
         solver.log_stats()
-
+    animation = process_results(snapshots_per_sec)
     return 0
+
+
+
+# Fourier spectral methods - Soft (Chebyshev) boundary set to 0
+def dedalus_sovle_chebyshev():
+    # Params
+    timestepper = d3.SBDF2
+    timestep = 0.05
+    stop_sim_time = 5
+    Nx = 100
+    Ny = 100
+    # This is currently a flaot
+    snapshots_per_sec = 1/timestep
+
+    # Bases
+    coords = d3.CartesianCoordinates('x', 'y') # maybe 'z'
+    dist = d3.Distributor(coords, dtype=np.float64)
+    xbasis = d3.Chebyshev(coords['x'], size=Nx, bounds=(0, 1))
+    ybasis = d3.Chebyshev(coords['y'], size=Ny, bounds=(0, 1))
+
+    # Fields
+    h = dist.Field(name='h',bases=(xbasis,ybasis))
+    
+    # Forcing
+    f = dist.Field(name='f',bases=(xbasis,ybasis))
+    gauss = gaussian2d(shape=f['g'].shape, sigma=5, amplitude=20, normalize=False)
+    h['g'][:] = gauss
+    f.fill_random('g', seed=40)
+    tau_x1 = dist.Field(name='tau_x1', bases=(ybasis,))
+    tau_x2 = dist.Field(name='tau_x2', bases=(ybasis,))
+    tau_y1 = dist.Field(name='tau_y1', bases=(xbasis,))
+    tau_y2 = dist.Field(name='tau_y2', bases=(xbasis,))
+    
+
+    lift_x1 = d3.Lift(tau_x1, xbasis, -1)
+    lift_x2 = d3.Lift(tau_x2, xbasis, -2)
+    lift_y1 = d3.Lift(tau_y1, ybasis, -1)
+    lift_y2 = d3.Lift(tau_y2, ybasis, -2)
+
+    # Subs
+    x, y = dist.local_grids(xbasis, ybasis)
+    D = 0.1
+
+    # Problem
+    problem = d3.IVP([h, tau_x1, tau_x2, tau_y1, tau_y2], namespace=locals())
+
+    problem.add_equation(
+    "dt(h) - D*lap(h) + lift_x1 + lift_x2 + lift_y1 + lift_y2 = f"
+    )
+
+    problem.add_equation("h(x=0) = 0")
+    problem.add_equation("h(x=1) = 0")
+    problem.add_equation("h(y=0) = 0")
+    problem.add_equation("h(y=1) = 0")
+    # Solve
+    solver = problem.build_solver(timestepper)
+    solver.stop_sim_time = stop_sim_time
+
+    # Analysis
+    snapshots = solver.evaluator.add_file_handler('snapshot', sim_dt=timestep, max_writes=snapshots_per_sec)
+    snapshots.add_task(h, name='temp')
+
+    # Main loop
+    try:
+        logger.info('Starting main loop')
+
+        while solver.proceed:
+            solver.step(timestep)
+            if (solver.iteration-1) % 10 == 0:
+                logger.info('Iteration=%i, Time=%e, dt=%e' %(solver.iteration, solver.sim_time, timestep))
+    except:
+        logger.error('Exception raised, triggering end of main loop.')
+        raise
+    finally:
+        solver.log_stats()
+    animation = process_results(snapshots_per_sec)
+    return 0
+
+
+
+# def explore_h5(group, prefix=''):
+#     for key in group.keys():
+#         item = group[key]
+#         path = f"{prefix}/{key}" if prefix else key
+#         if isinstance(item, h5.Dataset):
+#             print(f"Dataset: {path}, shape: {item.shape}, dtype: {item.dtype}")
+#         elif isinstance(item, h5.Group):
+#             print(f"Group: {path}")
+#             explore_h5(item, path)
+#     return 0
+
+
 
 
 if __name__ == "__main__":
