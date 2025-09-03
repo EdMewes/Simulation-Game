@@ -3,8 +3,10 @@ import matplotlib.animation as animation
 import h5py as h5
 from physics_sim.keys import numeric
 import os
+from matplotlib.artist import Artist
+from typing import List, Sequence, Tuple
 
-def dedalus(file_name, only_first:bool=True):
+def dedalus(file_name:str, only_first:bool=True) -> None:
     with h5.File(file_name, 'r') as f:
 
         temp = f[f'tasks/temp'][:] 
@@ -29,18 +31,31 @@ def dedalus(file_name, only_first:bool=True):
             plt.ylabel('Y grid')
             plt.savefig(f'fig/snapshot_s{(file_num)}_{i}.png', dpi = 10)
             plt.close()
-    return 0
+    return None
 
 
-def frame_lookup(global_frame, files, frame_count):
+def frame_lookup(
+        global_frame:int,
+        files:Sequence[str],
+        frame_count:int
+        ) -> Tuple[str, int]:
+
     for index, snapshot_count in enumerate(frame_count):
         if global_frame < snapshot_count:
             return files[index], global_frame
         global_frame -= snapshot_count
+    
     raise IndexError
 
 
-def animate(files, frame_count, snapshot_rate ,save_file_path):
+def animate(
+        files:Sequence[str],
+        frame_count:Sequence[int],
+        snapshot_rate:float
+        ,save_file_path:str,
+        boundary_type:str
+        ) -> None:
+
     # Create first frame
     fig, ax = plt.subplots()
     with h5.File(files[0], "r") as f:
@@ -48,20 +63,23 @@ def animate(files, frame_count, snapshot_rate ,save_file_path):
         im = ax.imshow(first, origin="lower", cmap="viridis", aspect="auto")
         plt.colorbar(im, ax=ax)
 
-    def update(global_frame):
+
+    def update(global_frame:int) -> List[Artist]:
         file, index = frame_lookup(global_frame, files, frame_count)
         with h5.File(file, "r") as f:
             data = f["tasks"]["temp"][index]
             im.set_array(data)
-            im.set_clim(vmin=data.min(), vmax=data.max())
+            # im.set_clim(vmin=data.min(), vmax=data.max())
             ax.set_title(f"{os.path.basename(file)} frame {index}")
             return [im]
         
     
-    total_frames = sum(frame_count)    
-    ani = animation.FuncAnimation(fig, update, frames=total_frames, interval=1000/snapshot_rate, blit=True)
+    total_frames = sum(frame_count)
+    if boundary_type == 'chebyshev':   
+        ani = animation.FuncAnimation(fig, update, frames=range(2,total_frames), interval=1000/snapshot_rate, blit=True)
+    else:
+        ani = animation.FuncAnimation(fig, update, frames=total_frames, interval=1000/snapshot_rate, blit=True)
     ani.save(save_file_path)
 
 
-
-    return 0
+    return None
