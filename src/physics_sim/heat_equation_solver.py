@@ -46,35 +46,36 @@ from sympy.solvers.pde import pdsolve
 from sympy import Function, Eq
 from sympy.abc import x, y
 
+from typing import Tuple
+import numpy.typing as npt
+
 
 logger = logging.getLogger(__name__)
 
 
-test_size = 100
-run_cases = 2
-# @tf
 
 
-def gaussian2d(shape=(100, 100), sigma=10.0, amplitude=1.0, normalize=False):
+def gaussian2d(
+        shape:Tuple[int, int]=(100, 100),
+        sigma:float = 10.0,
+        amplitude:float = 1.0,
+        normalize:bool = False
+        ) -> np.ndarray:
     h, w = shape
     y = np.arange(h) - (h - 1) / 2.0
     x = np.arange(w) - (w - 1) / 2.0
     X, Y = np.meshgrid(x, y)  # X varies along columns, Y along rows
-
     g = amplitude * np.exp(-(X**2 + Y**2) / (2.0 * sigma**2))
     if normalize:
         s = g.sum()
         if s != 0:
             g = g / s
-    # print(np.shape(g))
     return g
 
 
-# Example: 100x100, centered, sigma=12, normalized to sum to 1
-data = gaussian2d((100, 100), sigma=12.0, amplitude=1.0, normalize=True)
 
 # Banded matrix unusable at larger (>100x100 grid size due to memory requirements)
-def CNM_band_matrix_build(x_size, y_size):
+def CNM_band_matrix_build(x_size:int, y_size:int) -> np.ndarray:
     # Define size of simulation
     def_coef = 100
     delta_t = 0.05
@@ -100,7 +101,11 @@ def CNM_band_matrix_build(x_size, y_size):
     row = band_mat[x_size + 1]
     row.fill(-alpha)
     row[::x_size] = 0
+
+    print('a', type(band_mat))
     return band_mat
+
+a = CNM_band_matrix_build(10,10)
 
 def CNM_band_solve(initial_data, x_size, band_mat):
     band_mat_next_step = solve_banded((x_size, x_size), band_mat, initial_data.ravel())
@@ -149,10 +154,6 @@ def CNM_spsolve(sp_matrix, initial_data):
 #     return
 
 
-def scipy_sovle():
-    return
-
-
 def matrix_free_sovle():
     return
 
@@ -165,7 +166,7 @@ def firedrake_sovle():
     return
 
 
-def process_results(snapshots_rate):
+def process_images(snapshots_rate:float, boundary_type:str) -> None:
     files = sorted(glob.glob("snapshot/snapshot*.h5"), key=numeric)
     frame_counter = []
     for file_nam in files:
@@ -174,18 +175,19 @@ def process_results(snapshots_rate):
         with h5.File(file_nam, 'r') as f:
             print(file_nam,f["tasks"]["temp"].shape)
             frame_counter.append(f["tasks"]["temp"].shape[0])
+    print('counter',type(frame_counter))
 
-    animation = plot.animate(files, frame_counter, snapshots_rate, 'animation/diffusion.mp4')
-    return animation
+    plot.animate(files, frame_counter, snapshots_rate, f'animation/diffusion_{boundary_type}.mp4', boundary_type)
+    return None
 
 
 
 # Fourier spectral methods - Periodic boundary, diffusion spills over
-def dedalus_sovle_fourier():
+def dedalus_sovle_fourier() -> None:
     # Params
     timestepper = d3.SBDF2
     timestep = 0.05
-    stop_sim_time = 5
+    stop_sim_time = 2
     Nx = 100
     Ny = 100
     # This is currently a flaot
@@ -235,13 +237,12 @@ def dedalus_sovle_fourier():
         raise
     finally:
         solver.log_stats()
-    animation = process_results(snapshots_per_sec)
-    return 0
-
+    animation = process_images(snapshots_per_sec, "fourier")
+    return None
 
 
 # Fourier spectral methods - Soft (Chebyshev) boundary set to 0
-def dedalus_sovle_chebyshev():
+def dedalus_sovle_chebyshev() -> None:
     # Params
     timestepper = d3.SBDF2
     timestep = 0.05
@@ -262,9 +263,9 @@ def dedalus_sovle_chebyshev():
     
     # Forcing
     f = dist.Field(name='f',bases=(xbasis,ybasis))
-    gauss = gaussian2d(shape=f['g'].shape, sigma=5, amplitude=20, normalize=False)
+    gauss = gaussian2d(shape=f['g'].shape, sigma=10, amplitude=2, normalize=False)
     h['g'][:] = gauss
-    f.fill_random('g', seed=40)
+    # f.fill_random('g', seed=40)
     tau_x1 = dist.Field(name='tau_x1', bases=(ybasis,))
     tau_x2 = dist.Field(name='tau_x2', bases=(ybasis,))
     tau_y1 = dist.Field(name='tau_y1', bases=(xbasis,))
@@ -278,7 +279,7 @@ def dedalus_sovle_chebyshev():
 
     # Subs
     x, y = dist.local_grids(xbasis, ybasis)
-    D = 0.1
+    D = 0.01
 
     # Problem
     problem = d3.IVP([h, tau_x1, tau_x2, tau_y1, tau_y2], namespace=locals())
@@ -312,8 +313,14 @@ def dedalus_sovle_chebyshev():
         raise
     finally:
         solver.log_stats()
-    animation = process_results(snapshots_per_sec)
-    return 0
+    animation = process_images(snapshots_per_sec, "chebyshev")
+    return None
+
+
+
+
+
+
 
 
 
@@ -332,7 +339,12 @@ def dedalus_sovle_chebyshev():
 
 
 if __name__ == "__main__":
-    spmat = CNM_spmatrix_build(test_size, test_size)
+    test_size = 100
+    run_cases = 2
+    
+    # spmat = CNM_spmatrix_build(test_size, test_size)
     data = np.random.rand(test_size, test_size)
-    time = timeit.timeit(lambda: CNM_spsolve(spmat, data), number=run_cases)
-    print("Average runtime of sparse:", time / run_cases)
+    data = gaussian2d((100, 100), sigma=12.0, amplitude=1.0, normalize=True)
+
+    # time = timeit.timeit(lambda: CNM_spsolve(spmat, data), number=run_cases)
+    # print("Average runtime of sparse:", time / run_cases)
