@@ -1,0 +1,16 @@
+.venv/
+.ruff_cache/
+
+src/snapshot/*
+!src/snapshot/.gitkeep
+
+src/fig/*
+!src/fig/.gitkeep
+
+src/animation/*
+!src/animation/.gitkeep
+
+
+__pycache__/
+*.pyc
+
