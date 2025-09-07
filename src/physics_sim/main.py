@@ -25,8 +25,10 @@ from physics_sim import heat_equation_solver as het
 
 def main():
 
-    # sim = het.dedalus_sovle_fourier()
-    sim = het.dedalus_sovle_chebyshev()
+    print(type(np.zeros((1,2))))
+
+    het.dedalus_sovle_fourier()
+    # het.dedalus_sovle_chebyshev()
 
     # print('hi there')
 
