@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM condaforge/mambaforge:latest AS builder
+FROM condaforge/mambaforge:latest AS builder_dedalus
 
 WORKDIR /opt
 
@@ -14,6 +14,16 @@ RUN mamba create -y -n dedalus-env -c conda-forge \
 RUN conda env config vars set -n dedalus-env OMP_NUM_THREADS=1 && \
     conda env config vars set -n dedalus-env NUMEXPR_MAX_THREADS=1
 
+
+
+COPY pyproject.toml .
+COPY . .
+
+RUN /opt/conda/envs/dedalus-env/bin/pip install . 
+
+
+FROM condaforge/mambaforge:latest AS builder_fenics
+
 # FEniCS env
 RUN mamba create -y -n fenics-env -c conda-forge \
     python=3.12 \
@@ -25,26 +35,33 @@ RUN mamba create -y -n fenics-env -c conda-forge \
     mpich \
     && mamba clean -afy
 
-
 COPY pyproject.toml .
 COPY . .
 
-RUN /opt/conda/envs/dedalus-env/bin/pip install . 
+RUN /opt/conda/envs/fenics-env/bin/pip install . 
+
+
+
 
 FROM condaforge/mambaforge:latest AS runtime
 
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+
 WORKDIR /app
 
+RUN touch /app/.last_env && chmod 666 /app/.last_env
 
-
-
-COPY --from=builder /opt/conda/envs/dedalus-env \
+COPY --from=builder_dedalus /opt/conda/envs/dedalus-env \
                     /opt/conda/envs/dedalus-env
-COPY --from=builder /opt/.venv /app/.venv
 
-RUN mkdir /plots
+COPY --from=builder_fenics /opt/conda/envs/fenics-env \
+                    /opt/conda/envs/fenics-env
 
-ENV PATH="/opt/conda/envs/dedalus-env/bin:/app/.venv/bin:$PATH"
+
+ENV PATH="/opt/conda/envs/dedalus-env/bin:/opt/conda/envs/fenics-env/bin:/app/.venv/bin:$PATH"
 
 COPY . /app
 
