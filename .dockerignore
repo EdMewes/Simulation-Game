@@ -7,7 +7,7 @@ __pycache__/
 
 .ruff_cache
 
-.env
+.venv
 
 src/snapshot/*
 !src/snapshot/
@@ -17,3 +17,6 @@ src/fig/*
 
 src/animation/*
 !src/animation/
+
+.python-version
+uv.lock
