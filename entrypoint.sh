@@ -28,9 +28,9 @@ if [ -z "$ENV_NAME" ]; then
     exec bash
 fi
 
-if conda info --envs | grep -xq -- "$ENV_NAME"; then
+if conda info --envs | awk '{print $1}' | grep -qx "$ENV_NAME"; then
     printf '%s\n' "$ENV_NAME" > "$ENV_FILE"
-    exec conda run -n "$ENV_NAME" bash
+    conda run -n "$ENV_NAME" bash
 else
     echo "Environment '$ENV_NAME' not found. Starting default bash."
     exec bash
